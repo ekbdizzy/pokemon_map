@@ -1,5 +1,8 @@
+from typing import Optional
+
 import folium
 import json
+
 from django.http import HttpResponseNotFound
 from django.shortcuts import render
 
@@ -21,10 +24,20 @@ def add_pokemon(folium_map, lat, lon, image_url=DEFAULT_IMAGE_URL):
     ).add_to(folium_map)
 
 
-def _get_image_url_or_none(object):
-    if object.image:
-        return object.image.url
+def _get_image_url_or_none(instance) -> str:
+    if instance.image:
+        return instance.image.url
     return ''
+
+
+def _create_evolution_description(request, instance) -> Optional[dict]:
+    if instance:
+        return {
+            "title_ru": instance.title_ru,
+            "pokemon_id": instance.id,
+            "img_url": request.build_absolute_uri(instance.image.url)
+        }
+    return
 
 
 def show_all_pokemons(request):
@@ -60,13 +73,17 @@ def show_pokemon(request, pokemon_id):
             pokemon_entity.lat, pokemon_entity.lon,
             request.build_absolute_uri(pokemon_entity.pokemon.image.url))
 
+    previous_evolution = requested_pokemon.previous_evolution
+    next_evolution = Pokemon.objects.filter(previous_evolution=requested_pokemon).first()
+
     pokemon = {
         "title_ru": requested_pokemon.title_ru,
         "title_en": requested_pokemon.title_en,
         "title_jp": requested_pokemon.title_jp,
         "description": requested_pokemon.description,
-        "img_url": request.build_absolute_uri(requested_pokemon.image.url)
-
+        "img_url": request.build_absolute_uri(requested_pokemon.image.url),
+        "previous_evolution": _create_evolution_description(request, previous_evolution),
+        "next_evolution": _create_evolution_description(request, next_evolution),
     }
 
     return render(request, "pokemon.html", context={'map': folium_map._repr_html_(),
